@@ -1,42 +1,40 @@
-import { useState, useEffect } from 'react'
-import type { ClickUpTaskRow } from '../types'
-import type { HierarchyState } from '../hooks/useClickUp'
+import { useState } from 'react'
+import type { ClickUpTaskRow, ClickUpList } from '../types'
+import type { ClickUpState } from '../hooks/useClickUp'
 
 interface ClickUpViewProps {
   token: string | null
   tokenLoading: boolean
+  discovering: boolean
+  discoveryError: string | null
   tasks: ClickUpTaskRow[]
   tasksLoading: boolean
-  hierarchy: HierarchyState
-  hierarchyLoading: boolean
+  state: ClickUpState
   isSyncing: boolean
   onSaveToken: (token: string) => Promise<boolean>
   onRemoveToken: () => Promise<boolean>
-  onLoadTeams: () => void
-  onSelectTeam: (teamId: string) => void
-  onSelectSpace: (spaceId: string) => void
   onSelectList: (listId: string, listName: string) => void
   onSyncList: () => void
-  onCreate: (task: { name: string; description?: string; priority?: number; due_date?: number }) => Promise<boolean>
-  onUpdate: (clickupId: string, updates: { name?: string; status?: string; priority?: number }) => Promise<boolean>
+  onCreateList: (name: string) => Promise<boolean>
+  onCreate: (task: { name: string; description?: string }) => Promise<boolean>
+  onUpdate: (clickupId: string, updates: { name?: string; status?: string }) => Promise<boolean>
   onDelete: (clickupId: string) => Promise<boolean>
 }
 
 export function ClickUpView({
   token,
   tokenLoading,
+  discovering,
+  discoveryError,
   tasks,
   tasksLoading,
-  hierarchy,
-  hierarchyLoading,
+  state,
   isSyncing,
   onSaveToken,
   onRemoveToken,
-  onLoadTeams,
-  onSelectTeam,
-  onSelectSpace,
   onSelectList,
   onSyncList,
+  onCreateList,
   onCreate,
   onUpdate,
   onDelete,
@@ -45,22 +43,12 @@ export function ClickUpView({
   const [tokenInput, setTokenInput] = useState('')
   const [savingToken, setSavingToken] = useState(false)
 
-  // Load teams when token becomes available
-  useEffect(() => {
-    if (token && hierarchy.teams.length === 0) {
-      onLoadTeams()
-    }
-  }, [token, hierarchy.teams.length, onLoadTeams])
-
   const handleSaveToken = async () => {
     if (!tokenInput.trim()) return
     setSavingToken(true)
-    const ok = await onSaveToken(tokenInput.trim())
+    await onSaveToken(tokenInput.trim())
     setSavingToken(false)
-    if (ok) {
-      setShowSettings(false)
-      setTokenInput('')
-    }
+    setTokenInput('')
   }
 
   if (tokenLoading) {
@@ -71,7 +59,7 @@ export function ClickUpView({
     )
   }
 
-  // No token — show setup
+  // No token — connect screen
   if (!token) {
     return (
       <div className="max-w-md mx-auto mt-20">
@@ -79,7 +67,7 @@ export function ClickUpView({
           <div className="text-4xl">🟣</div>
           <h2 className="text-xl font-semibold text-gray-900">Connect ClickUp</h2>
           <p className="text-sm text-gray-500">
-            Enter your Personal API Token to browse and manage ClickUp tasks from the dashboard.
+            Enter your Personal API Token to connect to the Dolphia workspace.
           </p>
           <p className="text-xs text-gray-400">
             Find it at: ClickUp → Settings → My Settings → Apps → API Token
@@ -88,9 +76,13 @@ export function ClickUpView({
             type="password"
             value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveToken()}
             placeholder="pk_..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
+          {discoveryError && (
+            <p className="text-xs text-red-500">{discoveryError}</p>
+          )}
           <button
             onClick={handleSaveToken}
             disabled={savingToken || !tokenInput.trim()}
@@ -103,20 +95,30 @@ export function ClickUpView({
     )
   }
 
+  // Discovering (first connect, traversing hierarchy)
+  if (discovering) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-2">
+          <div className="text-2xl animate-pulse">🟣</div>
+          <p className="text-gray-500 text-sm">Connecting to Dolphia...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 max-w-5xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">ClickUp</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">ClickUp — Dolphia</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {hierarchy.selectedListName
-              ? `Viewing: ${hierarchy.selectedListName}`
-              : 'Select a list to view tasks'}
+            {state.selectedListName ? `Viewing: ${state.selectedListName}` : 'Select a list to view tasks'}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {hierarchy.selectedListId && (
+          {state.selectedListId && (
             <button
               onClick={onSyncList}
               disabled={isSyncing}
@@ -129,16 +131,17 @@ export function ClickUpView({
             onClick={() => setShowSettings(!showSettings)}
             className="px-3 py-1.5 text-gray-500 hover:text-gray-700 text-sm border border-gray-200 rounded-lg cursor-pointer"
           >
-            ⚙️ Settings
+            ⚙️
           </button>
         </div>
       </div>
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-          <h3 className="text-sm font-medium text-gray-700">ClickUp Settings</h3>
-          <p className="text-xs text-gray-400">Token: {token.slice(0, 6)}...{token.slice(-4)}</p>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            Token: {token.slice(0, 8)}...{token.slice(-4)}
+          </p>
           <button
             onClick={async () => {
               await onRemoveToken()
@@ -146,110 +149,31 @@ export function ClickUpView({
             }}
             className="px-3 py-1.5 text-red-600 hover:text-red-700 text-sm border border-red-200 rounded-lg cursor-pointer"
           >
-            Disconnect ClickUp
+            Disconnect
           </button>
         </div>
       )}
 
+      {discoveryError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-600">
+          {discoveryError}
+        </div>
+      )}
+
       <div className="flex gap-5">
-        {/* Left: Hierarchy Navigator */}
-        <div className="w-64 shrink-0">
-          <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider px-1">
-              Workspace
-            </h3>
-
-            {hierarchyLoading && (
-              <p className="text-xs text-gray-400 px-1">Loading...</p>
-            )}
-
-            {/* Teams */}
-            {hierarchy.teams.length > 1 && (
-              <div className="space-y-0.5">
-                {hierarchy.teams.map((team) => (
-                  <button
-                    key={team.id}
-                    onClick={() => onSelectTeam(team.id)}
-                    className={`w-full text-left px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
-                      hierarchy.selectedTeamId === team.id
-                        ? 'bg-purple-50 text-purple-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    🏢 {team.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Spaces */}
-            {hierarchy.spaces.length > 0 && (
-              <div className="space-y-0.5">
-                <p className="text-xs text-gray-400 px-1 pt-1">Spaces</p>
-                {hierarchy.spaces.map((space) => (
-                  <button
-                    key={space.id}
-                    onClick={() => onSelectSpace(space.id)}
-                    className={`w-full text-left px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
-                      hierarchy.selectedSpaceId === space.id
-                        ? 'bg-purple-50 text-purple-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    📂 {space.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Folders + Lists */}
-            {hierarchy.selectedSpaceId && (
-              <div className="space-y-0.5">
-                {hierarchy.folders.map((folder) => (
-                  <div key={folder.id}>
-                    <p className="text-xs text-gray-400 px-1 pt-2">{folder.name}</p>
-                    {folder.lists.map((list) => (
-                      <button
-                        key={list.id}
-                        onClick={() => onSelectList(list.id, list.name)}
-                        className={`w-full text-left px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
-                          hierarchy.selectedListId === list.id
-                            ? 'bg-purple-50 text-purple-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        📋 {list.name}
-                      </button>
-                    ))}
-                  </div>
-                ))}
-
-                {hierarchy.folderlessLists.length > 0 && (
-                  <>
-                    <p className="text-xs text-gray-400 px-1 pt-2">Lists</p>
-                    {hierarchy.folderlessLists.map((list) => (
-                      <button
-                        key={list.id}
-                        onClick={() => onSelectList(list.id, list.name)}
-                        className={`w-full text-left px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
-                          hierarchy.selectedListId === list.id
-                            ? 'bg-purple-50 text-purple-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        📋 {list.name}
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+        {/* Left: Lists Sidebar */}
+        <div className="w-56 shrink-0">
+          <ListsSidebar
+            lists={state.lists}
+            selectedListId={state.selectedListId}
+            onSelectList={onSelectList}
+            onCreateList={onCreateList}
+          />
         </div>
 
-        {/* Right: Task List */}
+        {/* Right: Tasks */}
         <div className="flex-1 min-w-0">
-          {!hierarchy.selectedListId ? (
+          {!state.selectedListId ? (
             <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
               <p className="text-gray-400">Select a list from the sidebar to view tasks.</p>
             </div>
@@ -264,6 +188,101 @@ export function ClickUpView({
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// --- Lists Sidebar ---
+
+function ListsSidebar({
+  lists,
+  selectedListId,
+  onSelectList,
+  onCreateList,
+}: {
+  lists: ClickUpList[]
+  selectedListId: string | null
+  onSelectList: (id: string, name: string) => void
+  onCreateList: (name: string) => Promise<boolean>
+}) {
+  const [showNewList, setShowNewList] = useState(false)
+  const [newListName, setNewListName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const handleCreate = async () => {
+    if (!newListName.trim()) return
+    setCreating(true)
+    const ok = await onCreateList(newListName.trim())
+    if (ok) {
+      setNewListName('')
+      setShowNewList(false)
+    }
+    setCreating(false)
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-1">
+      <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider px-1 pb-1">
+        Dolphia
+      </p>
+
+      {lists.length === 0 && (
+        <p className="text-xs text-gray-400 px-1 py-2">No lists yet.</p>
+      )}
+
+      {lists.map((list) => (
+        <button
+          key={list.id}
+          onClick={() => onSelectList(list.id, list.name)}
+          className={`w-full text-left px-2 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+            selectedListId === list.id
+              ? 'bg-purple-50 text-purple-700 font-medium'
+              : 'text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          📋 {list.name}
+        </button>
+      ))}
+
+      {/* New List */}
+      {showNewList ? (
+        <div className="pt-1 space-y-1">
+          <input
+            type="text"
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreate()
+              if (e.key === 'Escape') setShowNewList(false)
+            }}
+            placeholder="List name..."
+            autoFocus
+            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          <div className="flex gap-1">
+            <button
+              onClick={handleCreate}
+              disabled={creating || !newListName.trim()}
+              className="flex-1 px-2 py-1 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 cursor-pointer"
+            >
+              {creating ? '...' : 'Create'}
+            </button>
+            <button
+              onClick={() => { setShowNewList(false); setNewListName('') }}
+              className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowNewList(true)}
+          className="w-full text-left px-2 py-1.5 text-xs text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer mt-1"
+        >
+          + New List
+        </button>
+      )}
     </div>
   )
 }
@@ -317,7 +336,6 @@ function TaskList({
         </div>
       </div>
 
-      {/* Tasks */}
       {loading ? (
         <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
           <p className="text-gray-400">Loading tasks...</p>
@@ -368,7 +386,6 @@ function TaskCard({
   const handleDelete = async () => {
     setDeleting(true)
     await onDelete(task.clickup_id)
-    setDeleting(false)
   }
 
   const priorityColors: Record<string, string> = {
@@ -379,16 +396,13 @@ function TaskCard({
   }
 
   const dueDate = task.due_date
-    ? new Date(task.due_date).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      })
+    ? new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : null
-
-  const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status_name !== 'closed'
+  const isOverdue =
+    task.due_date && new Date(task.due_date) < new Date() && task.status_name !== 'closed'
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 transition-all hover:shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-sm transition-all">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {editing ? (
@@ -399,25 +413,15 @@ function TaskCard({
                 onChange={(e) => setEditName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSave()
-                  if (e.key === 'Escape') setEditing(false)
+                  if (e.key === 'Escape') { setEditing(false); setEditName(task.name) }
                 }}
                 className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 autoFocus
               />
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 cursor-pointer"
-              >
+              <button onClick={handleSave} disabled={saving} className="px-2 py-1 text-xs bg-purple-600 text-white rounded cursor-pointer">
                 {saving ? '...' : 'Save'}
               </button>
-              <button
-                onClick={() => {
-                  setEditing(false)
-                  setEditName(task.name)
-                }}
-                className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
-              >
+              <button onClick={() => { setEditing(false); setEditName(task.name) }} className="px-2 py-1 text-xs text-gray-500 cursor-pointer">
                 Cancel
               </button>
             </div>
@@ -431,7 +435,6 @@ function TaskCard({
           )}
 
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            {/* Status */}
             {task.status_name && (
               <span
                 className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
@@ -440,87 +443,39 @@ function TaskCard({
                 {task.status_name}
               </span>
             )}
-
-            {/* Priority */}
             {task.priority_label && (
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  priorityColors[task.priority_label.toLowerCase()] ?? 'bg-gray-100 text-gray-600'
-                }`}
-              >
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${priorityColors[task.priority_label.toLowerCase()] ?? 'bg-gray-100 text-gray-600'}`}>
                 {task.priority_label}
               </span>
             )}
-
-            {/* Due date */}
             {dueDate && (
-              <span
-                className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}
-              >
-                {isOverdue ? '⚠️ ' : ''}
-                {dueDate}
+              <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                {isOverdue ? '⚠️ ' : ''}{dueDate}
               </span>
             )}
-
-            {/* Tags */}
-            {task.tags?.map((tag: any) => (
-              <span
-                key={tag.name}
-                className="text-xs px-1.5 py-0.5 rounded"
-                style={{
-                  backgroundColor: tag.tag_bg || '#e5e7eb',
-                  color: tag.tag_fg || '#374151',
-                }}
-              >
-                {tag.name}
-              </span>
-            ))}
           </div>
-
           {task.description && (
             <p className="text-xs text-gray-400 mt-1 truncate">{task.description}</p>
           )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {/* Open in ClickUp */}
           {task.url && (
-            <a
-              href={task.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 text-gray-400 hover:text-purple-600 transition-colors"
-              title="Open in ClickUp"
-            >
+            <a href={task.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-purple-600 transition-colors" title="Open in ClickUp">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
           )}
-
-          {/* Delete */}
           {showConfirm ? (
             <div className="flex items-center gap-1">
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer"
-              >
+              <button onClick={handleDelete} disabled={deleting} className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 cursor-pointer">
                 {deleting ? '...' : 'Yes'}
               </button>
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
-              >
-                No
-              </button>
+              <button onClick={() => setShowConfirm(false)} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700 cursor-pointer">No</button>
             </div>
           ) : (
-            <button
-              onClick={() => setShowConfirm(true)}
-              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
-              title="Delete"
-            >
+            <button onClick={() => setShowConfirm(true)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer" title="Delete">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>

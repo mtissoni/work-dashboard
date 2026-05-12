@@ -121,3 +121,28 @@ export async function updateTask(
 export async function deleteTask(token: string, taskId: string): Promise<void> {
   await clickupFetch<unknown>('DELETE', `/task/${taskId}`, token)
 }
+
+// --- Lists ---
+
+export async function fetchFolderLists(token: string, folderId: string): Promise<ClickUpList[]> {
+  const res = await clickupFetch<{ lists: { id: string; name: string }[] }>(
+    'GET',
+    `/folder/${folderId}/list?archived=false`,
+    token
+  )
+  return res.lists?.map((l) => ({ id: l.id, name: l.name })) ?? []
+}
+
+export async function createList(
+  token: string,
+  folderId: string,
+  name: string
+): Promise<ClickUpList> {
+  const res = await clickupFetch<{ id: string; name: string }>(
+    'POST',
+    `/folder/${folderId}/list`,
+    token,
+    { name }
+  )
+  return { id: res.id, name: res.name }
+}

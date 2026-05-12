@@ -80,17 +80,16 @@ export default function App() {
   const {
     token: clickUpToken,
     tokenLoading: clickUpTokenLoading,
+    discovering: clickUpDiscovering,
+    discoveryError: clickUpDiscoveryError,
     saveToken: saveClickUpToken,
     removeToken: removeClickUpToken,
     tasks: clickUpTasks,
     tasksLoading: clickUpTasksLoading,
-    hierarchy: clickUpHierarchy,
-    hierarchyLoading: clickUpHierarchyLoading,
-    loadTeams: loadClickUpTeams,
-    selectTeam: selectClickUpTeam,
-    selectSpace: selectClickUpSpace,
+    state: clickUpState,
     selectList: selectClickUpList,
     refreshTasks: refreshClickUpTasks,
+    createList: createClickUpList,
     createTask: createClickUpTask,
     updateTask: updateClickUpTask,
     removeTask: removeClickUpTask,
@@ -111,8 +110,8 @@ export default function App() {
         syncNews(userId).then(() => fetchNews()),
         fetchCalendar(),
       ]
-      if (clickUpToken && clickUpHierarchy.selectedListId) {
-        syncs.push(syncClickUp(clickUpToken, userId, clickUpHierarchy.selectedListId).then(() => refreshClickUpTasks()))
+      if (clickUpToken && clickUpState.selectedListId) {
+        syncs.push(syncClickUp(clickUpToken, userId, clickUpState.selectedListId).then(() => refreshClickUpTasks()))
       }
       await Promise.all(syncs)
     } catch (err: any) {
@@ -125,13 +124,13 @@ export default function App() {
           syncNews(userId).then(() => fetchNews()),
           fetchCalendar(),
         ]
-        if (clickUpToken && clickUpHierarchy.selectedListId) {
-          syncs.push(syncClickUp(clickUpToken, userId, clickUpHierarchy.selectedListId).then(() => refreshClickUpTasks()))
+        if (clickUpToken && clickUpState.selectedListId) {
+          syncs.push(syncClickUp(clickUpToken, userId, clickUpState.selectedListId).then(() => refreshClickUpTasks()))
         }
         await Promise.all(syncs)
       }
     }
-  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken, clickUpToken, clickUpHierarchy.selectedListId, syncClickUp, refreshClickUpTasks])
+  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken, clickUpToken, clickUpState.selectedListId, syncClickUp, refreshClickUpTasks])
 
   const handleMarkComplete = useCallback(
     async (task: TaskEnrichment) => {
@@ -277,7 +276,7 @@ export default function App() {
             recurringEnabledCount={recurringEnabledCount}
             clickUpTasks={clickUpTasks}
             clickUpConnected={!!clickUpToken}
-            clickUpListName={clickUpHierarchy.selectedListName}
+            clickUpListName={clickUpState.selectedListName}
             onNavigate={setCurrentView}
             onSync={handleSync}
             onMarkNewsRead={markNewsRead}
@@ -340,23 +339,22 @@ export default function App() {
           <ClickUpView
             token={clickUpToken}
             tokenLoading={clickUpTokenLoading}
+            discovering={clickUpDiscovering}
+            discoveryError={clickUpDiscoveryError}
             tasks={clickUpTasks}
             tasksLoading={clickUpTasksLoading}
-            hierarchy={clickUpHierarchy}
-            hierarchyLoading={clickUpHierarchyLoading}
+            state={clickUpState}
             isSyncing={isSyncingClickUp}
             onSaveToken={saveClickUpToken}
             onRemoveToken={removeClickUpToken}
-            onLoadTeams={loadClickUpTeams}
-            onSelectTeam={selectClickUpTeam}
-            onSelectSpace={selectClickUpSpace}
             onSelectList={selectClickUpList}
             onSyncList={async () => {
-              if (clickUpToken && userId && clickUpHierarchy.selectedListId) {
-                await syncClickUp(clickUpToken, userId, clickUpHierarchy.selectedListId)
+              if (clickUpToken && userId && clickUpState.selectedListId) {
+                await syncClickUp(clickUpToken, userId, clickUpState.selectedListId)
                 await refreshClickUpTasks()
               }
             }}
+            onCreateList={createClickUpList}
             onCreate={createClickUpTask}
             onUpdate={updateClickUpTask}
             onDelete={removeClickUpTask}
