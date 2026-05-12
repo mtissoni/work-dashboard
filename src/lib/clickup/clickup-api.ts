@@ -31,8 +31,7 @@ async function clickupFetch<T>(
   body?: unknown
 ): Promise<T> {
   const { data, error } = await supabase.functions.invoke('clickup-proxy', {
-    body: { method, path, body },
-    headers: { 'clickup-token': token },
+    body: { method, path, body, clickup_token: token },
   })
 
   if (error) {
@@ -62,7 +61,7 @@ export async function fetchTeams(token: string): Promise<ClickUpTeam[]> {
 export async function fetchSpaces(token: string, teamId: string): Promise<ClickUpSpace[]> {
   const res = await clickupFetch<{ spaces: { id: string; name: string }[] }>(
     'GET',
-    `/team/${teamId}/space`,
+    `/team/${teamId}/space?archived=false`,
     token
   )
   return res.spaces?.map((s) => ({ id: s.id, name: s.name })) ?? []
@@ -71,7 +70,7 @@ export async function fetchSpaces(token: string, teamId: string): Promise<ClickU
 export async function fetchFolders(token: string, spaceId: string): Promise<ClickUpFolder[]> {
   const res = await clickupFetch<{ folders: { id: string; name: string; lists: { id: string; name: string }[] }[] }>(
     'GET',
-    `/space/${spaceId}/folder`,
+    `/space/${spaceId}/folder?archived=false`,
     token
   )
   return (

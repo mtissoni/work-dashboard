@@ -14,6 +14,7 @@ interface ProxyRequest {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE'
   path: string
   body?: unknown
+  clickup_token?: string
 }
 
 Deno.serve(async (req) => {
@@ -45,17 +46,17 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get ClickUp token from header
-    const clickupToken = req.headers.get('clickup-token')
+    // Parse proxy request
+    const { method, path, body, clickup_token } = (await req.json()) as ProxyRequest
+
+    // Get ClickUp token from body or header (body preferred)
+    const clickupToken = clickup_token || req.headers.get('clickup-token')
     if (!clickupToken) {
       return new Response(JSON.stringify({ error: 'Missing ClickUp token' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-
-    // Parse proxy request
-    const { method, path, body } = (await req.json()) as ProxyRequest
 
     // Proxy to ClickUp API
     const clickupRes = await fetch(`${CLICKUP_BASE}${path}`, {
