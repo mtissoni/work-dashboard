@@ -86,7 +86,7 @@ export default function App() {
     removeToken: removeClickUpToken,
     tasks: clickUpTasks,
     tasksLoading: clickUpTasksLoading,
-    state: clickUpState,
+    state: clickUpStateRaw,
     selectList: selectClickUpList,
     refreshTasks: refreshClickUpTasks,
     createList: createClickUpList,
@@ -94,6 +94,7 @@ export default function App() {
     updateTask: updateClickUpTask,
     removeTask: removeClickUpTask,
   } = useClickUp(userId)
+  const clickUpState = clickUpStateRaw ?? { lists: [], folderId: null, selectedListId: null, selectedListName: null }
   const { sync: syncClickUp, isSyncing: isSyncingClickUp } = useClickUpSync()
 
   const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews || isSyncingClickUp
