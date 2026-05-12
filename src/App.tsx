@@ -98,6 +98,7 @@ export default function App() {
 
   const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews || isSyncingClickUp
   const lastSyncedAt = lastTaskSync
+  const clickUpSelectedListId = clickUpState?.selectedListId ?? null
 
   const handleSync = useCallback(async () => {
     if (!googleToken || !userId) return
@@ -110,8 +111,8 @@ export default function App() {
         syncNews(userId).then(() => fetchNews()),
         fetchCalendar(),
       ]
-      if (clickUpToken && clickUpState.selectedListId) {
-        syncs.push(syncClickUp(clickUpToken, userId, clickUpState.selectedListId).then(() => refreshClickUpTasks()))
+      if (clickUpToken && clickUpSelectedListId) {
+        syncs.push(syncClickUp(clickUpToken, userId, clickUpSelectedListId).then(() => refreshClickUpTasks()))
       }
       await Promise.all(syncs)
     } catch (err: any) {
@@ -124,13 +125,13 @@ export default function App() {
           syncNews(userId).then(() => fetchNews()),
           fetchCalendar(),
         ]
-        if (clickUpToken && clickUpState.selectedListId) {
-          syncs.push(syncClickUp(clickUpToken, userId, clickUpState.selectedListId).then(() => refreshClickUpTasks()))
+        if (clickUpToken && clickUpSelectedListId) {
+          syncs.push(syncClickUp(clickUpToken, userId, clickUpSelectedListId).then(() => refreshClickUpTasks()))
         }
         await Promise.all(syncs)
       }
     }
-  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken, clickUpToken, clickUpState.selectedListId, syncClickUp, refreshClickUpTasks])
+  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken, clickUpToken, clickUpSelectedListId, syncClickUp, refreshClickUpTasks])
 
   const handleMarkComplete = useCallback(
     async (task: TaskEnrichment) => {
