@@ -9,7 +9,7 @@ export async function signInWithGoogle() {
   return supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      scopes: 'https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/gmail.modify',
+      scopes: 'https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/calendar.readonly',
       redirectTo: window.location.origin,
       queryParams: {
         access_type: 'offline',

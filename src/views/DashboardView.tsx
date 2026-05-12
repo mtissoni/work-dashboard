@@ -1,13 +1,24 @@
-import type { TaskEnrichment, EmailCacheRow, ViewType } from '../types'
+import type { TaskEnrichment, EmailCacheRow, FeedItem, CalendarEvent, RecurringTemplate, ViewType } from '../types'
 import { EmailTriageWidget } from '../components/EmailTriageWidget'
+import { NewsWidget } from '../components/NewsWidget'
+import { CalendarWidget } from '../components/CalendarWidget'
+import { RecurringWidget } from '../components/RecurringWidget'
 import { isOverdue, isDueToday } from '../utils/date-helpers'
 
 interface DashboardViewProps {
   tasks: TaskEnrichment[]
   actionableEmails: EmailCacheRow[]
   totalEmailCount: number
+  todayVideo: FeedItem | null
+  todayArticle: FeedItem | null
+  newsUnreadCount: number
+  todayEvents: CalendarEvent[]
+  nextEvent: CalendarEvent | null
+  recurringTemplates: RecurringTemplate[]
+  recurringEnabledCount: number
   onNavigate: (view: ViewType) => void
   onSync: () => void
+  onMarkNewsRead: (id: string) => void
   isSyncing: boolean
 }
 
@@ -15,8 +26,16 @@ export function DashboardView({
   tasks,
   actionableEmails,
   totalEmailCount,
+  todayVideo,
+  todayArticle,
+  newsUnreadCount,
+  todayEvents,
+  nextEvent,
+  recurringTemplates,
+  recurringEnabledCount,
   onNavigate,
   onSync,
+  onMarkNewsRead,
   isSyncing,
 }: DashboardViewProps) {
   const overdueCount = tasks.filter((t) => isOverdue(t.due_date)).length
@@ -77,6 +96,20 @@ export function DashboardView({
           </div>
         </div>
 
+        {/* Calendar Widget */}
+        <CalendarWidget
+          todayEvents={todayEvents}
+          nextEvent={nextEvent}
+          onNavigate={onNavigate}
+        />
+
+        {/* Recurring Widget */}
+        <RecurringWidget
+          templates={recurringTemplates}
+          enabledCount={recurringEnabledCount}
+          onNavigate={onNavigate}
+        />
+
         {/* Email Triage Widget */}
         <EmailTriageWidget
           actionableEmails={actionableEmails}
@@ -84,6 +117,15 @@ export function DashboardView({
           onNavigate={onNavigate}
         />
       </div>
+
+      {/* AI News Widget */}
+      <NewsWidget
+        todayVideo={todayVideo}
+        todayArticle={todayArticle}
+        unreadCount={newsUnreadCount}
+        onNavigate={onNavigate}
+        onMarkRead={onMarkNewsRead}
+      />
 
       {/* Quick Actions */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -99,6 +141,7 @@ export function DashboardView({
           <QuickAction label="View Tasks" onClick={() => onNavigate('all')} />
           <QuickAction label="View Inbox" onClick={() => onNavigate('inbox')} />
           <QuickAction label="My Lists" onClick={() => onNavigate('lists')} />
+          <QuickAction label="AI News" onClick={() => onNavigate('news')} />
         </div>
       </div>
     </div>

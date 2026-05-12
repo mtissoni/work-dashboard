@@ -4,6 +4,11 @@ import { useTasks } from './hooks/useTasks'
 import { useSync } from './hooks/useSync'
 import { useGmail } from './hooks/useGmail'
 import { useEmailSync } from './hooks/useEmailSync'
+import { useNews } from './hooks/useNews'
+import { useNewsSync } from './hooks/useNewsSync'
+import { useCalendar } from './hooks/useCalendar'
+import { useRecurringTemplates } from './hooks/useRecurringTemplates'
+import { generateRecurringTasks, applyTemplateEnrichment } from './lib/recurring/generate-tasks'
 import { markTaskComplete, updateTaskDueDate } from './lib/sync/google-tasks'
 import { LoginPage } from './components/LoginPage'
 import { Sidebar } from './components/Sidebar'
@@ -16,6 +21,9 @@ import { AllTasksView } from './views/AllTasksView'
 import { OverdueView } from './views/OverdueView'
 import { ByCategoryView } from './views/ByCategoryView'
 import { ListsView } from './views/ListsView'
+import { NewsView } from './views/NewsView'
+import { CalendarView } from './views/CalendarView'
+import { TemplatesView } from './views/TemplatesView'
 import type { ViewType, TaskEnrichment, TaskFilters, EmailCacheRow } from './types'
 
 export default function App() {
@@ -26,6 +34,7 @@ export default function App() {
   const [selectedEmail, setSelectedEmail] = useState<EmailCacheRow | null>(null)
   const { sync: syncTasks, isSyncing: isSyncingTasks, lastSyncedAt: lastTaskSync } = useSync()
   const { sync: syncEmails, isSyncing: isSyncingEmails } = useEmailSync()
+  const { sync: syncNews, isSyncing: isSyncingNews } = useNewsSync()
   const { tasks, loading: tasksLoading, fetchTasks, updateEnrichment, removeTask, sourceListOptions } = useTasks(
     userId,
     currentView === 'all' ? filters : undefined
@@ -39,27 +48,60 @@ export default function App() {
     doMarkRead,
     doStar,
   } = useGmail(userId)
+  const {
+    items: newsItems,
+    loading: newsLoading,
+    fetchItems: fetchNews,
+    markRead: markNewsRead,
+    toggleStar: toggleNewsStar,
+    todayVideo,
+    todayArticle,
+    unreadCount: newsUnreadCount,
+  } = useNews(userId)
+  const {
+    todayEvents,
+    upcomingEvents,
+    nextEvent,
+    loading: calendarLoading,
+    fetchEvents: fetchCalendar,
+  } = useCalendar(googleToken, refreshGoogleToken)
+  const {
+    templates,
+    loading: templatesLoading,
+    enabledCount: recurringEnabledCount,
+    createTemplate,
+    updateTemplate,
+    toggleTemplate,
+    deleteTemplate,
+  } = useRecurringTemplates(userId)
 
-  const isSyncing = isSyncingTasks || isSyncingEmails
+  const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews
   const lastSyncedAt = lastTaskSync
 
   const handleSync = useCallback(async () => {
     if (!googleToken || !userId) return
     try {
+      // Generate recurring tasks before syncing (so they appear in the sync)
+      await generateRecurringTasks(googleToken, userId)
       await Promise.all([
-        syncTasks(googleToken, userId).then(() => fetchTasks()),
+        syncTasks(googleToken, userId).then(() => applyTemplateEnrichment(userId)).then(() => fetchTasks()),
         syncEmails(googleToken, userId).then(() => fetchEmails()),
+        syncNews(userId).then(() => fetchNews()),
+        fetchCalendar(),
       ])
     } catch (err: any) {
       if (err?.message?.includes('401')) {
         const newToken = await refreshGoogleToken()
+        await generateRecurringTasks(newToken, userId)
         await Promise.all([
-          syncTasks(newToken, userId).then(() => fetchTasks()),
+          syncTasks(newToken, userId).then(() => applyTemplateEnrichment(userId)).then(() => fetchTasks()),
           syncEmails(newToken, userId).then(() => fetchEmails()),
+          syncNews(userId).then(() => fetchNews()),
+          fetchCalendar(),
         ])
       }
     }
-  }, [googleToken, userId, syncTasks, syncEmails, fetchTasks, fetchEmails, refreshGoogleToken])
+  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken])
 
   const handleMarkComplete = useCallback(
     async (task: TaskEnrichment) => {
@@ -196,8 +238,16 @@ export default function App() {
             tasks={tasks}
             actionableEmails={actionableEmails}
             totalEmailCount={emails.length}
+            todayVideo={todayVideo}
+            todayArticle={todayArticle}
+            newsUnreadCount={newsUnreadCount}
+            todayEvents={todayEvents}
+            nextEvent={nextEvent}
+            recurringTemplates={templates}
+            recurringEnabledCount={recurringEnabledCount}
             onNavigate={setCurrentView}
             onSync={handleSync}
+            onMarkNewsRead={markNewsRead}
             isSyncing={isSyncing}
           />
         )}
@@ -218,7 +268,42 @@ export default function App() {
           )
         )}
 
-        {currentView !== 'dashboard' && currentView !== 'inbox' && (
+        {currentView === 'news' && (
+          newsLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-gray-400">Loading news...</p>
+            </div>
+          ) : (
+            <NewsView
+              items={newsItems}
+              onMarkRead={markNewsRead}
+              onToggleStar={toggleNewsStar}
+            />
+          )
+        )}
+
+        {currentView === 'calendar' && (
+          <CalendarView
+            todayEvents={todayEvents}
+            upcomingEvents={upcomingEvents}
+            loading={calendarLoading}
+          />
+        )}
+
+        {currentView === 'templates' && (
+          <TemplatesView
+            templates={templates}
+            loading={templatesLoading}
+            googleToken={googleToken}
+            refreshGoogleToken={refreshGoogleToken}
+            onCreate={createTemplate}
+            onUpdate={updateTemplate}
+            onToggle={toggleTemplate}
+            onDelete={deleteTemplate}
+          />
+        )}
+
+        {currentView !== 'dashboard' && currentView !== 'inbox' && currentView !== 'news' && currentView !== 'calendar' && currentView !== 'templates' && (
           tasksLoading ? (
             <div className="flex items-center justify-center h-64">
               <p className="text-gray-400">Loading tasks...</p>

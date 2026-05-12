@@ -91,7 +91,91 @@ export interface TaskFilters {
   search?: string
 }
 
-export type ViewType = 'dashboard' | 'lists' | 'today' | 'all' | 'overdue' | 'category' | 'inbox'
+export type ViewType = 'dashboard' | 'lists' | 'today' | 'all' | 'overdue' | 'category' | 'inbox' | 'news' | 'calendar' | 'templates'
+
+// Recurring task types
+
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly'
+
+export interface RecurrenceRule {
+  type: RecurrenceType
+  days?: number[]       // For weekly: 0=Sun through 6=Sat
+  day_of_month?: number // For monthly: 1-31
+}
+
+export interface RecurringTemplate {
+  id: string
+  user_id: string
+  title: string
+  notes: string | null
+  list_id: string
+  list_name: string | null
+  category: Category | null
+  priority: Priority | null
+  effort: Effort | null
+  recurrence_rule: RecurrenceRule
+  enabled: boolean
+  last_generated_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RecurringTaskLog {
+  id: string
+  user_id: string
+  template_id: string
+  generated_date: string
+  external_id: string
+  created_at: string
+}
+
+// Calendar types
+
+export interface CalendarEvent {
+  id: string
+  summary: string
+  description?: string
+  location?: string
+  start: { dateTime?: string; date?: string; timeZone?: string }
+  end: { dateTime?: string; date?: string; timeZone?: string }
+  htmlLink: string
+  status: string
+  organizer?: { email: string; displayName?: string; self?: boolean }
+  attendees?: { email: string; displayName?: string; responseStatus: string; self?: boolean }[]
+  conferenceData?: { entryPoints?: { entryPointType: string; uri: string }[] }
+}
+
+// News feed types
+
+export type FeedType = 'article' | 'video' | 'netsuite'
+
+export interface FeedSource {
+  id: string
+  user_id: string
+  name: string
+  feed_url: string
+  feed_type: FeedType
+  enabled: boolean
+  created_at: string
+}
+
+export interface FeedItem {
+  id: string
+  user_id: string
+  source_id: string
+  external_id: string
+  feed_type: FeedType
+  title: string
+  url: string
+  author: string | null
+  summary: string | null
+  thumbnail_url: string | null
+  published_at: string
+  is_read: boolean
+  is_starred: boolean
+  created_at: string
+  updated_at: string
+}
 
 // Gmail types
 

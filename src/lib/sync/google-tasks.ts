@@ -74,3 +74,18 @@ export async function updateTaskDueDate(
     body: JSON.stringify({ due: new Date(dueDate).toISOString() }),
   })
 }
+
+export async function createTask(
+  accessToken: string,
+  listId: string,
+  task: { title: string; notes?: string; due?: string }
+): Promise<GoogleTask> {
+  return apiFetch<GoogleTask>(`/lists/${listId}/tasks`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({
+      title: task.title,
+      notes: task.notes,
+      due: task.due ? new Date(task.due).toISOString() : undefined,
+    }),
+  })
+}
