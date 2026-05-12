@@ -99,6 +99,7 @@ export default function App() {
   const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews || isSyncingClickUp
   const lastSyncedAt = lastTaskSync
   const clickUpSelectedListId = clickUpState?.selectedListId ?? null
+  const clickUpSelectedListName = clickUpState?.selectedListName ?? null
 
   const handleSync = useCallback(async () => {
     if (!googleToken || !userId) return
@@ -277,7 +278,7 @@ export default function App() {
             recurringEnabledCount={recurringEnabledCount}
             clickUpTasks={clickUpTasks}
             clickUpConnected={!!clickUpToken}
-            clickUpListName={clickUpState.selectedListName}
+            clickUpListName={clickUpSelectedListName}
             onNavigate={setCurrentView}
             onSync={handleSync}
             onMarkNewsRead={markNewsRead}
@@ -350,8 +351,8 @@ export default function App() {
             onRemoveToken={removeClickUpToken}
             onSelectList={selectClickUpList}
             onSyncList={async () => {
-              if (clickUpToken && userId && clickUpState.selectedListId) {
-                await syncClickUp(clickUpToken, userId, clickUpState.selectedListId)
+              if (clickUpToken && userId && clickUpSelectedListId) {
+                await syncClickUp(clickUpToken, userId, clickUpSelectedListId)
                 await refreshClickUpTasks()
               }
             }}
