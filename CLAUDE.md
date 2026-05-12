@@ -2,6 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## New PC Setup
+
+When Marcelo opens this project on a new machine, run `scripts/setup.ps1` to install dependencies and create `.env.local`. If Node.js or GitHub CLI are not installed, install them first:
+```powershell
+winget install OpenJS.NodeJS.LTS --scope user --accept-source-agreements --accept-package-agreements
+winget install GitHub.cli --accept-source-agreements --accept-package-agreements
+# Refresh PATH after installing:
+$env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "Machine")
+gh auth login --web -p https
+gh auth setup-git
+```
+
+If the project is not yet cloned:
+```powershell
+gh repo clone mtissoni/work-dashboard
+cd work-dashboard
+```
+
+Then run setup: `powershell -ExecutionPolicy Bypass -File scripts/setup.ps1`
+
+After setup, start the dev server: `npm.cmd run dev`
+
+**On returning PCs** (already set up): just `git pull` and `npm.cmd install` if package.json changed.
+
 ## Build & Dev Commands
 
 ```bash
@@ -20,13 +44,15 @@ There are no tests configured yet.
 
 ## Environment Setup
 
-Requires `.env.local` in project root (gitignored):
+Requires `.env.local` in project root (gitignored). The setup script creates this automatically. Values:
 ```
 VITE_SUPABASE_URL=https://ywrshvhjefrewobachke.supabase.co
-VITE_SUPABASE_ANON_KEY=<supabase anon key>
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3cnNodmhqZWZyZXdvYmFjaGtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjUzMTEsImV4cCI6MjA5NDAwMTMxMX0.xhVOPOu6qQsFtNPSeZUEcFSN4iCZRQ0jq2eGsvQUO-o
 ```
 
 External services: Supabase (PostgreSQL + Auth), Google Tasks API, Gmail API. OAuth scopes: `tasks` + `gmail.modify`.
+
+Google Cloud Project Client ID: `906845670124-lqksdrnrb0qhkj70pankj30ijgm2m0dk.apps.googleusercontent.com`
 
 ## Architecture
 
