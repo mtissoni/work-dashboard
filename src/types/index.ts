@@ -91,7 +91,7 @@ export interface TaskFilters {
   search?: string
 }
 
-export type ViewType = 'dashboard' | 'lists' | 'today' | 'all' | 'overdue' | 'category' | 'inbox' | 'news' | 'calendar' | 'templates'
+export type ViewType = 'dashboard' | 'lists' | 'today' | 'all' | 'overdue' | 'category' | 'inbox' | 'news' | 'calendar' | 'templates' | 'clickup'
 
 // Recurring task types
 
@@ -217,6 +217,82 @@ export interface EmailCacheRow {
   triaged_at: string | null
   triage_action: string | null
   linked_task_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ClickUp types
+
+export interface ClickUpTeam {
+  id: string
+  name: string
+}
+
+export interface ClickUpSpace {
+  id: string
+  name: string
+}
+
+export interface ClickUpFolder {
+  id: string
+  name: string
+  lists: ClickUpList[]
+}
+
+export interface ClickUpList {
+  id: string
+  name: string
+}
+
+export interface ClickUpTaskRow {
+  id: string
+  user_id: string
+  clickup_id: string
+  list_id: string
+  list_name: string | null
+  folder_name: string | null
+  space_name: string | null
+  name: string
+  description: string | null
+  status_name: string | null
+  status_color: string | null
+  priority_val: number | null
+  priority_label: string | null
+  assignees: { id: number; username: string; profilePicture: string | null }[]
+  tags: { name: string; tag_fg: string; tag_bg: string }[]
+  due_date: string | null
+  date_created: string | null
+  date_updated: string | null
+  url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ClickUpHierarchyNode {
+  id: string
+  user_id: string
+  team_id: string
+  team_name: string | null
+  space_id: string | null
+  space_name: string | null
+  folder_id: string | null
+  folder_name: string | null
+  list_id: string | null
+  list_name: string | null
+  node_type: 'team' | 'space' | 'folder' | 'list'
+}
+
+export interface CreateClickUpTask {
+  name: string
+  description?: string
+  priority?: number
+  due_date?: number // Unix ms
+}
+
+export interface UserSettings {
+  id: string
+  user_id: string
+  clickup_api_token: string | null
   created_at: string
   updated_at: string
 }

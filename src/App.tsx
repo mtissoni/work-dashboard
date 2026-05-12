@@ -8,6 +8,8 @@ import { useNews } from './hooks/useNews'
 import { useNewsSync } from './hooks/useNewsSync'
 import { useCalendar } from './hooks/useCalendar'
 import { useRecurringTemplates } from './hooks/useRecurringTemplates'
+import { useClickUp } from './hooks/useClickUp'
+import { useClickUpSync } from './hooks/useClickUpSync'
 import { generateRecurringTasks, applyTemplateEnrichment } from './lib/recurring/generate-tasks'
 import { markTaskComplete, updateTaskDueDate } from './lib/sync/google-tasks'
 import { LoginPage } from './components/LoginPage'
@@ -24,6 +26,7 @@ import { ListsView } from './views/ListsView'
 import { NewsView } from './views/NewsView'
 import { CalendarView } from './views/CalendarView'
 import { TemplatesView } from './views/TemplatesView'
+import { ClickUpView } from './views/ClickUpView'
 import type { ViewType, TaskEnrichment, TaskFilters, EmailCacheRow } from './types'
 
 export default function App() {
@@ -74,8 +77,27 @@ export default function App() {
     toggleTemplate,
     deleteTemplate,
   } = useRecurringTemplates(userId)
+  const {
+    token: clickUpToken,
+    tokenLoading: clickUpTokenLoading,
+    saveToken: saveClickUpToken,
+    removeToken: removeClickUpToken,
+    tasks: clickUpTasks,
+    tasksLoading: clickUpTasksLoading,
+    hierarchy: clickUpHierarchy,
+    hierarchyLoading: clickUpHierarchyLoading,
+    loadTeams: loadClickUpTeams,
+    selectTeam: selectClickUpTeam,
+    selectSpace: selectClickUpSpace,
+    selectList: selectClickUpList,
+    refreshTasks: refreshClickUpTasks,
+    createTask: createClickUpTask,
+    updateTask: updateClickUpTask,
+    removeTask: removeClickUpTask,
+  } = useClickUp(userId)
+  const { sync: syncClickUp, isSyncing: isSyncingClickUp } = useClickUpSync()
 
-  const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews
+  const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews || isSyncingClickUp
   const lastSyncedAt = lastTaskSync
 
   const handleSync = useCallback(async () => {
@@ -83,25 +105,33 @@ export default function App() {
     try {
       // Generate recurring tasks before syncing (so they appear in the sync)
       await generateRecurringTasks(googleToken, userId)
-      await Promise.all([
+      const syncs: Promise<unknown>[] = [
         syncTasks(googleToken, userId).then(() => applyTemplateEnrichment(userId)).then(() => fetchTasks()),
         syncEmails(googleToken, userId).then(() => fetchEmails()),
         syncNews(userId).then(() => fetchNews()),
         fetchCalendar(),
-      ])
+      ]
+      if (clickUpToken && clickUpHierarchy.selectedListId) {
+        syncs.push(syncClickUp(clickUpToken, userId, clickUpHierarchy.selectedListId).then(() => refreshClickUpTasks()))
+      }
+      await Promise.all(syncs)
     } catch (err: any) {
       if (err?.message?.includes('401')) {
         const newToken = await refreshGoogleToken()
         await generateRecurringTasks(newToken, userId)
-        await Promise.all([
+        const syncs: Promise<unknown>[] = [
           syncTasks(newToken, userId).then(() => applyTemplateEnrichment(userId)).then(() => fetchTasks()),
           syncEmails(newToken, userId).then(() => fetchEmails()),
           syncNews(userId).then(() => fetchNews()),
           fetchCalendar(),
-        ])
+        ]
+        if (clickUpToken && clickUpHierarchy.selectedListId) {
+          syncs.push(syncClickUp(clickUpToken, userId, clickUpHierarchy.selectedListId).then(() => refreshClickUpTasks()))
+        }
+        await Promise.all(syncs)
       }
     }
-  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken])
+  }, [googleToken, userId, syncTasks, syncEmails, syncNews, fetchTasks, fetchEmails, fetchNews, fetchCalendar, refreshGoogleToken, clickUpToken, clickUpHierarchy.selectedListId, syncClickUp, refreshClickUpTasks])
 
   const handleMarkComplete = useCallback(
     async (task: TaskEnrichment) => {
@@ -245,6 +275,9 @@ export default function App() {
             nextEvent={nextEvent}
             recurringTemplates={templates}
             recurringEnabledCount={recurringEnabledCount}
+            clickUpTasks={clickUpTasks}
+            clickUpConnected={!!clickUpToken}
+            clickUpListName={clickUpHierarchy.selectedListName}
             onNavigate={setCurrentView}
             onSync={handleSync}
             onMarkNewsRead={markNewsRead}
@@ -303,7 +336,34 @@ export default function App() {
           />
         )}
 
-        {currentView !== 'dashboard' && currentView !== 'inbox' && currentView !== 'news' && currentView !== 'calendar' && currentView !== 'templates' && (
+        {currentView === 'clickup' && (
+          <ClickUpView
+            token={clickUpToken}
+            tokenLoading={clickUpTokenLoading}
+            tasks={clickUpTasks}
+            tasksLoading={clickUpTasksLoading}
+            hierarchy={clickUpHierarchy}
+            hierarchyLoading={clickUpHierarchyLoading}
+            isSyncing={isSyncingClickUp}
+            onSaveToken={saveClickUpToken}
+            onRemoveToken={removeClickUpToken}
+            onLoadTeams={loadClickUpTeams}
+            onSelectTeam={selectClickUpTeam}
+            onSelectSpace={selectClickUpSpace}
+            onSelectList={selectClickUpList}
+            onSyncList={async () => {
+              if (clickUpToken && userId && clickUpHierarchy.selectedListId) {
+                await syncClickUp(clickUpToken, userId, clickUpHierarchy.selectedListId)
+                await refreshClickUpTasks()
+              }
+            }}
+            onCreate={createClickUpTask}
+            onUpdate={updateClickUpTask}
+            onDelete={removeClickUpTask}
+          />
+        )}
+
+        {currentView !== 'dashboard' && currentView !== 'inbox' && currentView !== 'news' && currentView !== 'calendar' && currentView !== 'templates' && currentView !== 'clickup' && (
           tasksLoading ? (
             <div className="flex items-center justify-center h-64">
               <p className="text-gray-400">Loading tasks...</p>

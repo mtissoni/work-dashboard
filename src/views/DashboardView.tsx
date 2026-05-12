@@ -1,8 +1,9 @@
-import type { TaskEnrichment, EmailCacheRow, FeedItem, CalendarEvent, RecurringTemplate, ViewType } from '../types'
+import type { TaskEnrichment, EmailCacheRow, FeedItem, CalendarEvent, RecurringTemplate, ClickUpTaskRow, ViewType } from '../types'
 import { EmailTriageWidget } from '../components/EmailTriageWidget'
 import { NewsWidget } from '../components/NewsWidget'
 import { CalendarWidget } from '../components/CalendarWidget'
 import { RecurringWidget } from '../components/RecurringWidget'
+import { ClickUpWidget } from '../components/ClickUpWidget'
 import { isOverdue, isDueToday } from '../utils/date-helpers'
 
 interface DashboardViewProps {
@@ -16,6 +17,9 @@ interface DashboardViewProps {
   nextEvent: CalendarEvent | null
   recurringTemplates: RecurringTemplate[]
   recurringEnabledCount: number
+  clickUpTasks: ClickUpTaskRow[]
+  clickUpConnected: boolean
+  clickUpListName: string | null
   onNavigate: (view: ViewType) => void
   onSync: () => void
   onMarkNewsRead: (id: string) => void
@@ -33,6 +37,9 @@ export function DashboardView({
   nextEvent,
   recurringTemplates,
   recurringEnabledCount,
+  clickUpTasks,
+  clickUpConnected,
+  clickUpListName,
   onNavigate,
   onSync,
   onMarkNewsRead,
@@ -107,6 +114,14 @@ export function DashboardView({
         <RecurringWidget
           templates={recurringTemplates}
           enabledCount={recurringEnabledCount}
+          onNavigate={onNavigate}
+        />
+
+        {/* ClickUp Widget */}
+        <ClickUpWidget
+          tasks={clickUpTasks}
+          connected={clickUpConnected}
+          selectedListName={clickUpListName}
           onNavigate={onNavigate}
         />
 

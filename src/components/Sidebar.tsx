@@ -15,6 +15,7 @@ const NAV_ITEMS: { view: ViewType; label: string; icon: string }[] = [
   { view: 'news', label: 'AI News', icon: '📰' },
   { view: 'calendar', label: 'Calendar', icon: '📅' },
   { view: 'templates', label: 'Recurring', icon: '🔁' },
+  { view: 'clickup', label: 'ClickUp', icon: '🟣' },
   { view: 'lists', label: 'My Lists', icon: '✅' },
   { view: 'today', label: 'Today / Next Up', icon: '☀️' },
   { view: 'all', label: 'All Tasks', icon: '📋' },
