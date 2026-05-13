@@ -6,65 +6,59 @@ interface ListsViewProps {
   tasks: TaskEnrichment[]
   onMarkComplete: (task: TaskEnrichment) => void
   onSelectTask: (task: TaskEnrichment) => void
+  onMoveTask: (task: TaskEnrichment, targetListId: string, targetListName: string) => Promise<void>
 }
 
-export function ListsView({ tasks, onMarkComplete, onSelectTask }: ListsViewProps) {
+export function ListsView({ tasks, onMarkComplete, onSelectTask, onMoveTask }: ListsViewProps) {
   const lists = groupByList(tasks)
-  const listNames = Object.keys(lists)
-  const [activeList, setActiveList] = useState<string>(listNames[0] ?? '')
+  const listEntries = Object.entries(lists)
 
-  if (listNames.length === 0) {
+  // Build a lookup: list_name → list_id (from any task in that list)
+  const listIdByName = new Map<string, string>()
+  for (const task of tasks) {
+    if (task.list_name && task.list_id && !listIdByName.has(task.list_name)) {
+      listIdByName.set(task.list_name, task.list_id)
+    }
+  }
+
+  if (listEntries.length === 0) {
     return (
       <div className="max-w-xl mx-auto pt-12 text-center text-gray-400">
         <p className="text-lg">No tasks synced yet.</p>
-        <p className="text-sm mt-2">Click "Sync Google Tasks" in the sidebar to get started.</p>
+        <p className="text-sm mt-2">Click "Sync All" in the sidebar to get started.</p>
       </div>
     )
   }
 
-  const currentTasks = lists[activeList] ?? []
-  const tree = buildTree(currentTasks)
-
   return (
-    <div className="max-w-xl mx-auto">
-      {/* List tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-1 overflow-x-auto">
-        {listNames.map((name) => (
-          <button
-            key={name}
-            onClick={() => setActiveList(name)}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
-              activeList === name
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {name}
-            <span className="ml-1.5 text-xs text-gray-400">
-              {lists[name].length}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Task list */}
-      <div className="divide-y divide-gray-100">
-        {tree.map((node) => (
-          <TaskItem
-            key={node.task.id}
-            node={node}
-            onMarkComplete={onMarkComplete}
-            onSelect={onSelectTask}
-            depth={0}
-          />
-        ))}
-      </div>
-
-      {currentTasks.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
-          <p>No tasks in this list.</p>
-        </div>
-      )}
+    <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+      {listEntries.map(([listName, listTasks]) => {
+        const tree = buildTree(listTasks)
+        return (
+          <div key={listName} className="flex-shrink-0 w-72 bg-gray-50 rounded-xl p-3">
+            <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1">{listName}
+              <span className="ml-1.5 text-xs font-normal text-gray-400">{listTasks.length}</span>
+            </h2>
+            <div className="divide-y divide-gray-100">
+              {tree.map((node) => (
+                <TaskItem
+                  key={node.task.id}
+                  node={node}
+                  depth={0}
+                  listIdByName={listIdByName}
+                  currentListName={listName}
+                  onMarkComplete={onMarkComplete}
+                  onSelect={onSelectTask}
+                  onMove={onMoveTask}
+                />
+              ))}
+            </div>
+            {listTasks.length === 0 && (
+              <p className="text-sm text-gray-400 px-1 py-2">No tasks.</p>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -76,54 +70,57 @@ interface TaskNode {
 
 function TaskItem({
   node,
+  depth,
+  listIdByName,
+  currentListName,
   onMarkComplete,
   onSelect,
-  depth,
+  onMove,
 }: {
   node: TaskNode
+  depth: number
+  listIdByName: Map<string, string>
+  currentListName: string
   onMarkComplete: (task: TaskEnrichment) => void
   onSelect: (task: TaskEnrichment) => void
-  depth: number
+  onMove: (task: TaskEnrichment, targetListId: string, targetListName: string) => Promise<void>
 }) {
   const { task, children } = node
+  const [showMoveMenu, setShowMoveMenu] = useState(false)
+  const [moving, setMoving] = useState(false)
   const overdue = isOverdue(task.due_date)
   const today = isDueToday(task.due_date)
+
+  const otherLists = [...listIdByName.entries()].filter(([name]) => name !== currentListName)
+
+  const handleMove = async (targetListId: string, targetListName: string) => {
+    setMoving(true)
+    setShowMoveMenu(false)
+    await onMove(task, targetListId, targetListName)
+    setMoving(false)
+  }
 
   return (
     <>
       <div
-        className="flex items-start gap-3 py-2.5 px-2 hover:bg-gray-50 rounded-lg cursor-pointer group transition-colors"
-        style={{ paddingLeft: `${8 + depth * 28}px` }}
-        onClick={() => onSelect(task)}
+        className="flex items-start gap-3 py-2.5 px-2 hover:bg-gray-50 rounded-lg group transition-colors"
+        style={{ paddingLeft: `${8 + depth * 24}px` }}
       >
         {/* Checkbox */}
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onMarkComplete(task)
-          }}
+          onClick={() => onMarkComplete(task)}
           className="mt-0.5 w-[18px] h-[18px] rounded-full border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer flex-shrink-0"
         />
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-800 leading-snug">
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onSelect(task)}>
+          <p className={`text-sm leading-snug ${moving ? 'text-gray-400' : 'text-gray-800'}`}>
             {task.title ?? 'Untitled'}
           </p>
-
-          {/* Details row */}
           <div className="flex items-center gap-2 mt-0.5">
             {task.due_date && (
-              <span
-                className={`text-xs ${
-                  overdue
-                    ? 'text-red-500'
-                    : today
-                    ? 'text-blue-600'
-                    : 'text-gray-400'
-                }`}
-              >
-                {overdue ? '!' : ''} {formatDate(task.due_date)}
+              <span className={`text-xs ${overdue ? 'text-red-500' : today ? 'text-blue-600' : 'text-gray-400'}`}>
+                {overdue ? '! ' : ''}{formatDate(task.due_date)}
               </span>
             )}
             {task.notes && (
@@ -135,16 +132,45 @@ function TaskItem({
             )}
           </div>
         </div>
+
+        {/* Move button — visible on hover, only for root tasks and if there are other lists */}
+        {depth === 0 && otherLists.length > 0 && (
+          <div className="relative opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMoveMenu((v) => !v) }}
+              className="p-1 text-gray-400 hover:text-gray-600 text-xs cursor-pointer rounded"
+              title="Move to list"
+            >
+              →
+            </button>
+            {showMoveMenu && (
+              <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg min-w-max py-1">
+                <p className="px-3 py-1 text-xs text-gray-400 font-medium">Move to</p>
+                {otherLists.map(([name, id]) => (
+                  <button
+                    key={id}
+                    onClick={() => handleMove(id, name)}
+                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Render subtasks */}
       {children.map((child) => (
         <TaskItem
           key={child.task.id}
           node={child}
+          depth={depth + 1}
+          listIdByName={listIdByName}
+          currentListName={currentListName}
           onMarkComplete={onMarkComplete}
           onSelect={onSelect}
-          depth={depth + 1}
+          onMove={onMove}
         />
       ))}
     </>
@@ -165,7 +191,6 @@ function buildTree(tasks: TaskEnrichment[]): TaskNode[] {
   const byExternalId = new Map<string, TaskNode>()
   const roots: TaskNode[] = []
 
-  // Sort by position
   const sorted = [...tasks].sort((a, b) =>
     (a.position ?? '').localeCompare(b.position ?? '')
   )

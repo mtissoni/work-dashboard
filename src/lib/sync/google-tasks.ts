@@ -75,6 +75,21 @@ export async function updateTaskDueDate(
   })
 }
 
+export async function deleteTask(
+  accessToken: string,
+  listId: string,
+  taskId: string
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/lists/${listId}/tasks/${taskId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok && res.status !== 204) {
+    const body = await res.text()
+    throw new Error(`Google Tasks API error ${res.status}: ${body}`)
+  }
+}
+
 export async function createTask(
   accessToken: string,
   listId: string,

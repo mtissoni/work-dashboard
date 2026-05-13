@@ -50,7 +50,9 @@ VITE_SUPABASE_URL=https://ywrshvhjefrewobachke.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3cnNodmhqZWZyZXdvYmFjaGtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MjUzMTEsImV4cCI6MjA5NDAwMTMxMX0.xhVOPOu6qQsFtNPSeZUEcFSN4iCZRQ0jq2eGsvQUO-o
 ```
 
-External services: Supabase (PostgreSQL + Auth), Google Tasks API, Gmail API. OAuth scopes: `tasks` + `gmail.modify`.
+External services: Supabase (PostgreSQL + Auth), Google Tasks API, Gmail API, Gemini API. OAuth scopes: `tasks` + `gmail.modify`.
+
+**Gemini API:** Key is stored per-user in `user_settings.gemini_api_key` (not in `.env.local`). Configured via the ⚙ button in the Inbox view. Get a free key at https://aistudio.google.com/apikey. Uses `gemini-2.0-flash` model. Persistent style instructions stored in `user_settings.gemini_instructions`.
 
 Google Cloud Project Client ID: `906845670124-lqksdrnrb0qhkj70pankj30ijgm2m0dk.apps.googleusercontent.com`
 

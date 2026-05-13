@@ -5,6 +5,7 @@ export interface ParsedEmail {
   senderName: string
   senderEmail: string
   date: string
+  messageId: string
 }
 
 export function parseHeaders(message: GmailMessage): ParsedEmail {
@@ -20,6 +21,7 @@ export function parseHeaders(message: GmailMessage): ParsedEmail {
     senderName: name,
     senderEmail: email,
     date: get('Date'),
+    messageId: get('Message-ID'),
   }
 }
 
@@ -33,7 +35,9 @@ function parseFromHeader(from: string): { name: string; email: string } {
 
 export function decodeBase64Url(data: string): string {
   const base64 = data.replace(/-/g, '+').replace(/_/g, '/')
-  return atob(base64)
+  const binary = atob(base64)
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
+  return new TextDecoder('utf-8').decode(bytes)
 }
 
 export function extractEmailBody(message: GmailMessage): string {

@@ -10,8 +10,9 @@ import { useCalendar } from './hooks/useCalendar'
 import { useRecurringTemplates } from './hooks/useRecurringTemplates'
 import { useClickUp } from './hooks/useClickUp'
 import { useClickUpSync } from './hooks/useClickUpSync'
+import { useGeminiSettings } from './hooks/useGeminiSettings'
 import { generateRecurringTasks, applyTemplateEnrichment } from './lib/recurring/generate-tasks'
-import { markTaskComplete, updateTaskDueDate } from './lib/sync/google-tasks'
+import { markTaskComplete, updateTaskDueDate, deleteTask, createTask } from './lib/sync/google-tasks'
 import { LoginPage } from './components/LoginPage'
 import { Sidebar } from './components/Sidebar'
 import { TaskDetailPanel } from './components/TaskDetailPanel'
@@ -28,6 +29,7 @@ import { CalendarView } from './views/CalendarView'
 import { TemplatesView } from './views/TemplatesView'
 import { ClickUpView } from './views/ClickUpView'
 import type { ViewType, TaskEnrichment, TaskFilters, EmailCacheRow } from './types'
+import type { CreateTaskData } from './components/EmailDetailPanel'
 
 export default function App() {
   const { session, googleToken, loading: authLoading, userId, signIn, signOut, refreshGoogleToken } = useAuth()
@@ -96,6 +98,7 @@ export default function App() {
   } = useClickUp(userId)
   const clickUpState = clickUpStateRaw ?? { lists: [], folderId: null, selectedListId: null, selectedListName: null }
   const { sync: syncClickUp, isSyncing: isSyncingClickUp } = useClickUpSync()
+  const { geminiApiKey, geminiInstructions, saveSettings: saveGeminiSettings } = useGeminiSettings(userId)
 
   const isSyncing = isSyncingTasks || isSyncingEmails || isSyncingNews || isSyncingClickUp
   const lastSyncedAt = lastTaskSync
@@ -154,6 +157,35 @@ export default function App() {
       }
     },
     [googleToken, refreshGoogleToken, removeTask, selectedTask]
+  )
+
+  const handleMoveTask = useCallback(
+    async (task: TaskEnrichment, targetListId: string, _targetListName: string) => {
+      if (!googleToken || !task.list_id) return
+      try {
+        await createTask(googleToken, targetListId, {
+          title: task.title ?? '',
+          notes: task.notes ?? undefined,
+          due: task.due_date ?? undefined,
+        })
+        await deleteTask(googleToken, task.list_id, task.external_id)
+        await fetchTasks()
+      } catch (err: any) {
+        if (err?.message?.includes('401')) {
+          const newToken = await refreshGoogleToken()
+          await createTask(newToken, targetListId, {
+            title: task.title ?? '',
+            notes: task.notes ?? undefined,
+            due: task.due_date ?? undefined,
+          })
+          await deleteTask(newToken, task.list_id!, task.external_id)
+          await fetchTasks()
+        } else {
+          console.error('Failed to move task:', err)
+        }
+      }
+    },
+    [googleToken, refreshGoogleToken, fetchTasks]
   )
 
   const handleChangeDueDate = useCallback(
@@ -223,11 +255,34 @@ export default function App() {
   )
 
   const handleCreateTaskFromEmail = useCallback(
-    async (_email: EmailCacheRow) => {
-      // TODO: Create a Google Task from email subject, then link via linked_task_id
-      alert('Create task from email — coming soon')
+    async (_email: EmailCacheRow, data: CreateTaskData) => {
+      if (!googleToken) return
+      try {
+        await createTask(googleToken, data.listId, {
+          title: data.title,
+          notes: data.notes || undefined,
+          due: data.dueDate || undefined,
+        })
+        await fetchTasks()
+      } catch (err: any) {
+        if (err?.message?.includes('401')) {
+          const newToken = await refreshGoogleToken()
+          await createTask(newToken, data.listId, {
+            title: data.title,
+            notes: data.notes || undefined,
+            due: data.dueDate || undefined,
+          })
+          await fetchTasks()
+        } else {
+          throw err
+        }
+      }
     },
-    []
+    [googleToken, refreshGoogleToken, fetchTasks]
+  )
+
+  const listOptions = Array.from(
+    new Map(tasks.filter((t) => t.list_id && t.list_name).map((t) => [t.list_id, { id: t.list_id!, name: t.list_name! }])).values()
   )
 
   if (authLoading) {
@@ -295,10 +350,13 @@ export default function App() {
           ) : (
             <InboxView
               emails={emails}
+              geminiApiKey={geminiApiKey}
+              geminiInstructions={geminiInstructions}
               onSelectEmail={setSelectedEmail}
               onArchive={handleArchiveEmail}
               onStar={handleStarEmail}
               onMarkRead={handleMarkReadEmail}
+              onSaveGeminiSettings={saveGeminiSettings}
             />
           )
         )}
@@ -322,6 +380,8 @@ export default function App() {
             todayEvents={todayEvents}
             upcomingEvents={upcomingEvents}
             loading={calendarLoading}
+            aiApiKey={geminiApiKey}
+            aiInstructions={geminiInstructions}
           />
         )}
 
@@ -376,6 +436,7 @@ export default function App() {
                   tasks={tasks}
                   onMarkComplete={handleMarkComplete}
                   onSelectTask={setSelectedTask}
+                  onMoveTask={handleMoveTask}
                 />
               )}
               {currentView === 'today' && <TodayView {...viewProps} />}
@@ -413,6 +474,9 @@ export default function App() {
         <EmailDetailPanel
           email={selectedEmail}
           googleToken={googleToken}
+          geminiApiKey={geminiApiKey}
+          geminiInstructions={geminiInstructions}
+          listOptions={listOptions}
           onClose={() => setSelectedEmail(null)}
           onArchive={handleArchiveEmail}
           onStar={handleStarEmail}

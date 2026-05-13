@@ -293,6 +293,10 @@ export interface UserSettings {
   id: string
   user_id: string
   clickup_api_token: string | null
+  clickup_folder_id: string | null
+  clickup_space_id: string | null
+  openai_api_key: string | null
+  ai_instructions: string | null
   created_at: string
   updated_at: string
 }
