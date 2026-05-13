@@ -4,6 +4,7 @@ import { NewsWidget } from '../components/NewsWidget'
 import { CalendarWidget } from '../components/CalendarWidget'
 import { RecurringWidget } from '../components/RecurringWidget'
 import { ClickUpWidget } from '../components/ClickUpWidget'
+import { AIChat, type ChatAction } from '../components/AIChat'
 import { isOverdue, isDueToday } from '../utils/date-helpers'
 
 interface DashboardViewProps {
@@ -20,9 +21,15 @@ interface DashboardViewProps {
   clickUpTasks: ClickUpTaskRow[]
   clickUpConnected: boolean
   clickUpListName: string | null
+  upcomingEvents: CalendarEvent[]
+  aiApiKey: string | null
+  aiInstructions: string | null
   onNavigate: (view: ViewType) => void
   onSync: () => void
   onMarkNewsRead: (id: string) => void
+  onArchiveEmail: (email: EmailCacheRow) => void
+  onStarEmail: (email: EmailCacheRow) => void
+  onMarkReadEmail: (email: EmailCacheRow) => void
   isSyncing: boolean
 }
 
@@ -40,11 +47,26 @@ export function DashboardView({
   clickUpTasks,
   clickUpConnected,
   clickUpListName,
+  upcomingEvents,
+  aiApiKey,
+  aiInstructions,
   onNavigate,
   onSync,
   onMarkNewsRead,
+  onArchiveEmail,
+  onStarEmail,
+  onMarkReadEmail,
   isSyncing,
 }: DashboardViewProps) {
+  const handleAIAction = async (action: ChatAction) => {
+    if (action.type === 'archive_email' || action.type === 'star_email' || action.type === 'mark_read') {
+      const email = actionableEmails.find((e) => e.gmail_id === action.gmailId)
+      if (!email) return
+      if (action.type === 'archive_email') await onArchiveEmail(email)
+      else if (action.type === 'star_email') await onStarEmail(email)
+      else await onMarkReadEmail(email)
+    }
+  }
   const overdueCount = tasks.filter((t) => isOverdue(t.due_date)).length
   const dueTodayCount = tasks.filter((t) => isDueToday(t.due_date)).length
   const highPriorityCount = tasks.filter((t) => t.priority === 'High').length
@@ -60,6 +82,15 @@ export function DashboardView({
         <p className="text-sm text-gray-500 mt-1">
           Here's what needs your attention today.
         </p>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-1">
+        <AIChat
+          apiKey={aiApiKey}
+          instructions={aiInstructions}
+          context={{ view: 'dashboard', emails: actionableEmails, todayEvents, upcomingEvents }}
+          onAction={handleAIAction}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

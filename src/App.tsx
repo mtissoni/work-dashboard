@@ -68,6 +68,7 @@ export default function App() {
     upcomingEvents,
     nextEvent,
     loading: calendarLoading,
+    error: calendarError,
     fetchEvents: fetchCalendar,
   } = useCalendar(googleToken, refreshGoogleToken)
   const {
@@ -182,6 +183,23 @@ export default function App() {
           await fetchTasks()
         } else {
           console.error('Failed to move task:', err)
+        }
+      }
+    },
+    [googleToken, refreshGoogleToken, fetchTasks]
+  )
+
+  const handleCreateTask = useCallback(
+    async (title: string, notes: string | undefined, listId: string, dueDate?: string) => {
+      if (!googleToken || !listId) return
+      try {
+        await createTask(googleToken, listId, { title, notes, due: dueDate })
+        await fetchTasks()
+      } catch (err: any) {
+        if (err?.message?.includes('401')) {
+          const newToken = await refreshGoogleToken()
+          await createTask(newToken, listId, { title, notes, due: dueDate })
+          await fetchTasks()
         }
       }
     },
@@ -329,15 +347,21 @@ export default function App() {
             todayArticle={todayArticle}
             newsUnreadCount={newsUnreadCount}
             todayEvents={todayEvents}
+            upcomingEvents={upcomingEvents}
             nextEvent={nextEvent}
             recurringTemplates={templates}
             recurringEnabledCount={recurringEnabledCount}
             clickUpTasks={clickUpTasks}
             clickUpConnected={!!clickUpToken}
             clickUpListName={clickUpSelectedListName}
+            aiApiKey={geminiApiKey}
+            aiInstructions={geminiInstructions}
             onNavigate={setCurrentView}
             onSync={handleSync}
             onMarkNewsRead={markNewsRead}
+            onArchiveEmail={handleArchiveEmail}
+            onStarEmail={handleStarEmail}
+            onMarkReadEmail={handleMarkReadEmail}
             isSyncing={isSyncing}
           />
         )}
@@ -357,6 +381,8 @@ export default function App() {
               onStar={handleStarEmail}
               onMarkRead={handleMarkReadEmail}
               onSaveGeminiSettings={saveGeminiSettings}
+              onSync={handleSync}
+              isSyncing={isSyncing}
             />
           )
         )}
@@ -380,8 +406,11 @@ export default function App() {
             todayEvents={todayEvents}
             upcomingEvents={upcomingEvents}
             loading={calendarLoading}
+            error={calendarError}
             aiApiKey={geminiApiKey}
             aiInstructions={geminiInstructions}
+            onSync={handleSync}
+            isSyncing={isSyncing}
           />
         )}
 
@@ -434,9 +463,16 @@ export default function App() {
               {currentView === 'lists' && (
                 <ListsView
                   tasks={tasks}
+                  accessToken={googleToken ?? ''}
+                  openAiApiKey={geminiApiKey}
+                  aiInstructions={geminiInstructions}
                   onMarkComplete={handleMarkComplete}
                   onSelectTask={setSelectedTask}
                   onMoveTask={handleMoveTask}
+                  onCreateTask={handleCreateTask}
+                  onRefresh={fetchTasks}
+                  onSync={handleSync}
+                  isSyncing={isSyncing}
                 />
               )}
               {currentView === 'today' && <TodayView {...viewProps} />}

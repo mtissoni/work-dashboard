@@ -11,7 +11,10 @@ export function EmailTriageWidget({
   totalCount,
   onNavigate,
 }: EmailTriageWidgetProps) {
-  const top5 = actionableEmails.slice(0, 5)
+  const sorted = [...actionableEmails].sort(
+    (a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime()
+  )
+  const top5 = sorted.slice(0, 5)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">

@@ -6,10 +6,12 @@ export function useCalendar(googleToken: string | null, refreshGoogleToken: () =
   const [todayEvents, setTodayEvents] = useState<CalendarEvent[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchEvents = useCallback(async () => {
     if (!googleToken) return
     setLoading(true)
+    setError(null)
 
     try {
       const [today, upcoming] = await Promise.all([
@@ -28,11 +30,11 @@ export function useCalendar(googleToken: string | null, refreshGoogleToken: () =
           ])
           setTodayEvents(today)
           setUpcomingEvents(upcoming)
-        } catch (retryErr) {
-          console.error('Failed to fetch calendar after refresh:', retryErr)
+        } catch (retryErr: any) {
+          setError(retryErr?.message ?? 'Failed to load calendar')
         }
       } else {
-        console.error('Failed to fetch calendar:', err)
+        setError(err?.message ?? 'Failed to load calendar')
       }
     } finally {
       setLoading(false)
@@ -56,6 +58,7 @@ export function useCalendar(googleToken: string | null, refreshGoogleToken: () =
     upcomingEvents,
     nextEvent,
     loading,
+    error,
     fetchEvents,
   }
 }

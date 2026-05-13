@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import type { CalendarEvent } from '../types'
 import { generateMeetingPrep, generateMeetingFollowUp } from '../lib/gemini/gemini-api'
+import { AIChat } from '../components/AIChat'
 
 interface CalendarViewProps {
   todayEvents: CalendarEvent[]
   upcomingEvents: CalendarEvent[]
   loading: boolean
+  error: string | null
   aiApiKey: string | null
   aiInstructions: string | null
+  onSync: () => void
+  isSyncing: boolean
 }
 
-export function CalendarView({ todayEvents, upcomingEvents, loading, aiApiKey, aiInstructions }: CalendarViewProps) {
+export function CalendarView({ todayEvents, upcomingEvents, loading, error, aiApiKey, aiInstructions, onSync, isSyncing }: CalendarViewProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -19,15 +23,47 @@ export function CalendarView({ todayEvents, upcomingEvents, loading, aiApiKey, a
     )
   }
 
+  if (error) {
+    const needsReauth = error.includes('401') || error.includes('403') || error.includes('scope') || error.includes('unauthorized')
+    return (
+      <div className="max-w-4xl space-y-4">
+        <div className="flex items-start justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
+          <button onClick={onSync} disabled={isSyncing} className="mt-1 px-2.5 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors cursor-pointer">
+            {isSyncing ? 'Retrying…' : '↻ Retry'}
+          </button>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-2">
+          <p className="text-sm font-medium text-red-700">Couldn't load calendar events</p>
+          <p className="text-xs text-red-500 font-mono break-all">{error}</p>
+          {needsReauth && (
+            <p className="text-sm text-red-600 mt-2">
+              This looks like a permissions error. Try <strong>signing out and signing back in</strong> to grant calendar access.
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   const grouped = groupByDay(upcomingEvents)
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {todayEvents.length} events today, {upcomingEvents.length} this week
-        </p>
+    <div className="space-y-6 max-w-4xl pb-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {todayEvents.length} events today, {upcomingEvents.length} this week
+          </p>
+        </div>
+        <button
+          onClick={onSync}
+          disabled={isSyncing}
+          className="mt-1 px-2.5 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors cursor-pointer"
+        >
+          {isSyncing ? 'Syncing…' : '↻ Sync'}
+        </button>
       </div>
 
       {grouped.length === 0 ? (
@@ -56,6 +92,13 @@ export function CalendarView({ todayEvents, upcomingEvents, loading, aiApiKey, a
           ))}
         </div>
       )}
+
+      <AIChat
+        apiKey={aiApiKey}
+        instructions={aiInstructions}
+        context={{ view: 'calendar', todayEvents, upcomingEvents }}
+        onAction={async () => {}}
+      />
     </div>
   )
 }
@@ -246,9 +289,12 @@ function EventCard({
           {/* Context form — always visible until brief is generated */}
           {!aiOutput && (
             <>
-              <label className="block text-xs text-gray-500">
-                Contame sobre esta reunión para que pueda prepararte mejor
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs text-gray-500">
+                  Contame sobre esta reunión para que pueda prepararte mejor
+                </label>
+                <button onClick={() => togglePanel('prep')} className="text-gray-400 hover:text-gray-600 text-sm leading-none cursor-pointer">×</button>
+              </div>
               <textarea
                 value={prepContext}
                 onChange={(e) => setPrepContext(e.target.value)}
@@ -308,7 +354,10 @@ function EventCard({
         <div className="mx-4 mb-3 bg-green-50 border border-green-100 rounded-lg p-3 space-y-2">
           {!aiOutput ? (
             <>
-              <label className="block text-xs text-gray-500">Paste transcript or meeting notes</label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs text-gray-500">Paste transcript or meeting notes</label>
+                <button onClick={() => togglePanel('followup')} className="text-gray-400 hover:text-gray-600 text-sm leading-none cursor-pointer">×</button>
+              </div>
               <textarea
                 value={transcript}
                 onChange={(e) => setTranscript(e.target.value)}

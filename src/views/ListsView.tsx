@@ -1,23 +1,90 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import {
+  DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors,
+  type DragStartEvent, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { TaskEnrichment } from '../types'
 import { formatDate, isOverdue, isDueToday } from '../utils/date-helpers'
+import { moveTaskPosition } from '../lib/sync/google-tasks'
+import { AIChat, type ChatAction } from '../components/AIChat'
 
 interface ListsViewProps {
   tasks: TaskEnrichment[]
+  accessToken: string
+  openAiApiKey: string | null
+  aiInstructions: string | null
   onMarkComplete: (task: TaskEnrichment) => void
   onSelectTask: (task: TaskEnrichment) => void
   onMoveTask: (task: TaskEnrichment, targetListId: string, targetListName: string) => Promise<void>
+  onCreateTask: (title: string, notes: string | undefined, listId: string, dueDate?: string) => Promise<void>
+  onRefresh: () => void
+  onSync: () => void
+  isSyncing: boolean
 }
 
-export function ListsView({ tasks, onMarkComplete, onSelectTask, onMoveTask }: ListsViewProps) {
-  const lists = groupByList(tasks)
-  const listEntries = Object.entries(lists)
+export function ListsView({ tasks, accessToken, openAiApiKey, aiInstructions, onMarkComplete, onSelectTask, onMoveTask, onCreateTask, onRefresh, onSync, isSyncing }: ListsViewProps) {
+  const [activeTask, setActiveTask] = useState<TaskEnrichment | null>(null)
 
-  // Build a lookup: list_name → list_id (from any task in that list)
+  const grouped = groupByList(tasks)
+  const listEntries = Object.entries(grouped)
+
   const listIdByName = new Map<string, string>()
   for (const task of tasks) {
     if (task.list_name && task.list_id && !listIdByName.has(task.list_name)) {
       listIdByName.set(task.list_name, task.list_id)
+    }
+  }
+
+  const lists = [...listIdByName.entries()].map(([name, id]) => ({ id, name }))
+
+  const handleAIAction = useCallback(async (action: ChatAction) => {
+    if (action.type === 'complete_task') {
+      const task = tasks.find((t) => t.id === action.taskId)
+      if (task) await onMarkComplete(task)
+    } else if (action.type === 'move_task') {
+      const task = tasks.find((t) => t.id === action.taskId)
+      if (task) await onMoveTask(task, action.targetListId, action.targetListName)
+    } else if (action.type === 'create_task') {
+      await onCreateTask(action.title, action.notes, action.listId, action.dueDate)
+    }
+  }, [tasks, onMarkComplete, onMoveTask, onCreateTask])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  function handleDragStart(event: DragStartEvent) {
+    const task = tasks.find(t => t.id === String(event.active.id))
+    setActiveTask(task ?? null)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    setActiveTask(null)
+    if (!over || active.id === over.id) return
+
+    const sourceTask = tasks.find(t => t.id === String(active.id))
+    if (!sourceTask) return
+
+    const overTask = tasks.find(t => t.id === String(over.id))
+
+    if (overTask && overTask.list_id === sourceTask.list_id) {
+      // Same list — reorder
+      const listTasks = tasks
+        .filter(t => t.list_id === sourceTask.list_id && !t.parent_external_id)
+        .sort((a, b) => (a.position ?? '').localeCompare(b.position ?? ''))
+      const oldIndex = listTasks.findIndex(t => t.id === String(active.id))
+      const newIndex = listTasks.findIndex(t => t.id === String(over.id))
+      if (oldIndex === -1 || newIndex === -1) return
+      const reordered = arrayMove(listTasks, oldIndex, newIndex)
+      const prevTask = reordered[newIndex - 1]
+      await moveTaskPosition(accessToken, sourceTask.list_id!, sourceTask.external_id, prevTask?.external_id)
+      onRefresh()
+    } else if (overTask && overTask.list_id !== sourceTask.list_id) {
+      // Different list — move
+      await onMoveTask(sourceTask, overTask.list_id!, overTask.list_name!)
     }
   }
 
@@ -31,36 +98,67 @@ export function ListsView({ tasks, onMarkComplete, onSelectTask, onMoveTask }: L
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-      {listEntries.map(([listName, listTasks]) => {
-        const tree = buildTree(listTasks)
-        return (
-          <div key={listName} className="flex-shrink-0 w-72 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
-            <div className="flex items-center justify-between mb-2.5 px-1">
-              <h2 className="text-sm font-semibold text-gray-800">{listName}</h2>
-              <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{listTasks.length}</span>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Lists</h1>
+          <p className="text-sm text-gray-500 mt-1">{tasks.length} tasks across {listEntries.length} lists</p>
+        </div>
+        <button
+          onClick={onSync}
+          disabled={isSyncing}
+          className="px-2.5 py-1 text-xs rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors cursor-pointer"
+        >
+          {isSyncing ? 'Syncing…' : '↻ Sync'}
+        </button>
+      </div>
+      <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+        {listEntries.map(([listName, listTasks]) => {
+          const tree = buildTree(listTasks)
+          const rootIds = tree.map(n => n.task.id)
+          return (
+            <div key={listName} className="flex-shrink-0 w-72 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
+              <div className="flex items-center justify-between mb-2.5 px-1">
+                <h2 className="text-sm font-semibold text-gray-800">{listName}</h2>
+                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{listTasks.length}</span>
+              </div>
+              <SortableContext items={rootIds} strategy={verticalListSortingStrategy}>
+                <div className="divide-y divide-gray-50">
+                  {tree.map((node) => (
+                    <SortableTaskItem
+                      key={node.task.id}
+                      node={node}
+                      listIdByName={listIdByName}
+                      currentListName={listName}
+                      onMarkComplete={onMarkComplete}
+                      onSelect={onSelectTask}
+                      onMove={onMoveTask}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+              {listTasks.length === 0 && (
+                <p className="text-sm text-gray-400 px-1 py-2">No tasks.</p>
+              )}
             </div>
-            <div className="divide-y divide-gray-50">
-              {tree.map((node) => (
-                <TaskItem
-                  key={node.task.id}
-                  node={node}
-                  depth={0}
-                  listIdByName={listIdByName}
-                  currentListName={listName}
-                  onMarkComplete={onMarkComplete}
-                  onSelect={onSelectTask}
-                  onMove={onMoveTask}
-                />
-              ))}
-            </div>
-            {listTasks.length === 0 && (
-              <p className="text-sm text-gray-400 px-1 py-2">No tasks.</p>
-            )}
+          )
+        })}
+      </div>
+      <DragOverlay>
+        {activeTask && (
+          <div className="bg-white border border-blue-200 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-800 opacity-90 w-64">
+            {activeTask.title}
           </div>
-        )
-      })}
-    </div>
+        )}
+      </DragOverlay>
+
+      <AIChat
+        apiKey={openAiApiKey}
+        instructions={aiInstructions}
+        context={{ view: 'tasks', tasks, lists }}
+        onAction={handleAIAction}
+      />
+    </DndContext>
   )
 }
 
@@ -69,23 +167,39 @@ interface TaskNode {
   children: TaskNode[]
 }
 
-function TaskItem({
-  node,
-  depth,
-  listIdByName,
-  currentListName,
-  onMarkComplete,
-  onSelect,
-  onMove,
-}: {
+interface TaskItemProps {
   node: TaskNode
-  depth: number
+  depth?: number
   listIdByName: Map<string, string>
   currentListName: string
   onMarkComplete: (task: TaskEnrichment) => void
   onSelect: (task: TaskEnrichment) => void
   onMove: (task: TaskEnrichment, targetListId: string, targetListName: string) => Promise<void>
-}) {
+}
+
+function SortableTaskItem(props: TaskItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.node.task.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <TaskItem {...props} depth={0} />
+    </div>
+  )
+}
+
+function TaskItem({
+  node,
+  depth = 0,
+  listIdByName,
+  currentListName,
+  onMarkComplete,
+  onSelect,
+  onMove,
+}: TaskItemProps) {
   const { task, children } = node
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const [moving, setMoving] = useState(false)
@@ -115,7 +229,7 @@ function TaskItem({
 
         {/* Content */}
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onSelect(task)}>
-          <p className={`text-sm leading-snug ${moving ? 'text-gray-400' : 'text-gray-800'}`}>
+          <p className={`text-sm leading-snug break-words ${moving ? 'text-gray-400' : 'text-gray-800'}`}>
             {task.title ?? 'Untitled'}
           </p>
           <div className="flex items-center gap-2 mt-0.5">
