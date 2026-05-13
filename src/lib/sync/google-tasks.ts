@@ -90,6 +90,19 @@ export async function deleteTask(
   }
 }
 
+export async function moveTaskPosition(
+  accessToken: string,
+  listId: string,
+  taskId: string,
+  previousTaskId?: string
+): Promise<void> {
+  const params = new URLSearchParams()
+  if (previousTaskId) params.set('previous', previousTaskId)
+  await apiFetch(`/lists/${listId}/tasks/${taskId}/move?${params}`, accessToken, {
+    method: 'POST',
+  })
+}
+
 export async function createTask(
   accessToken: string,
   listId: string,

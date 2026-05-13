@@ -27,7 +27,7 @@ export function TaskRow({ task, onUpdate, onMarkComplete, onChangeDueDate, onSel
 
   return (
     <tr
-      className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+      className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors cursor-pointer"
       onClick={() => onSelect(task)}
     >
       <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>

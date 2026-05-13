@@ -40,7 +40,7 @@ export function TaskTable({
     <div className="overflow-x-auto">
       <table className="w-full text-left">
         <thead>
-          <tr className="border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+          <tr className="border-b border-gray-100 text-[11px] text-gray-400 uppercase tracking-wider bg-gray-50/60">
             <th className="px-3 py-2 w-10"></th>
             <th className="px-3 py-2">Task</th>
             <th className="px-3 py-2 w-40">Due Date</th>

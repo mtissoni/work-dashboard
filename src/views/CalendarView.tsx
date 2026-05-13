@@ -24,7 +24,7 @@ export function CalendarView({ todayEvents, upcomingEvents, loading, aiApiKey, a
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Calendar</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Calendar</h1>
         <p className="text-sm text-gray-500 mt-1">
           {todayEvents.length} events today, {upcomingEvents.length} this week
         </p>
@@ -36,13 +36,13 @@ export function CalendarView({ todayEvents, upcomingEvents, loading, aiApiKey, a
         <div className="space-y-4">
           {grouped.map(({ date, label, isToday, events }) => (
             <div key={date} className="space-y-1">
-              <h2 className={`text-sm font-medium uppercase tracking-wider px-3 py-2 ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>
+              <h2 className={`text-[11px] font-semibold uppercase tracking-wider px-3 py-2 ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>
                 {label}
                 <span className="text-gray-400 ml-2 normal-case">
                   ({events.length} event{events.length !== 1 ? 's' : ''})
                 </span>
               </h2>
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-50">
                 {events.map((event) => (
                   <EventCard
                     key={event.id}

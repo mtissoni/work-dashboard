@@ -35,11 +35,12 @@ export function ListsView({ tasks, onMarkComplete, onSelectTask, onMoveTask }: L
       {listEntries.map(([listName, listTasks]) => {
         const tree = buildTree(listTasks)
         return (
-          <div key={listName} className="flex-shrink-0 w-72 bg-gray-50 rounded-xl p-3">
-            <h2 className="text-sm font-semibold text-gray-700 mb-2 px-1">{listName}
-              <span className="ml-1.5 text-xs font-normal text-gray-400">{listTasks.length}</span>
-            </h2>
-            <div className="divide-y divide-gray-100">
+          <div key={listName} className="flex-shrink-0 w-72 bg-white border border-gray-100 rounded-xl shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2.5 px-1">
+              <h2 className="text-sm font-semibold text-gray-800">{listName}</h2>
+              <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{listTasks.length}</span>
+            </div>
+            <div className="divide-y divide-gray-50">
               {tree.map((node) => (
                 <TaskItem
                   key={node.task.id}
@@ -103,7 +104,7 @@ function TaskItem({
   return (
     <>
       <div
-        className="flex items-start gap-3 py-2.5 px-2 hover:bg-gray-50 rounded-lg group transition-colors"
+        className="flex items-start gap-3 py-2.5 px-2 hover:bg-gray-50/80 rounded-lg group transition-colors"
         style={{ paddingLeft: `${8 + depth * 24}px` }}
       >
         {/* Checkbox */}

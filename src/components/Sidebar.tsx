@@ -46,15 +46,15 @@ export function Sidebar({
   lastSyncedAt,
 }: SidebarProps) {
   return (
-    <aside className="w-56 bg-gray-900 text-gray-300 flex flex-col h-screen sticky top-0">
-      <div className="p-4 border-b border-gray-700">
-        <h2 className="text-lg font-semibold text-white">Work Dashboard</h2>
+    <aside className="w-56 bg-gray-950 text-gray-400 flex flex-col h-screen sticky top-0">
+      <div className="px-4 py-4 border-b border-white/5">
+        <h2 className="text-sm font-bold text-white tracking-wide uppercase">Claudio</h2>
       </div>
 
-      <nav className="flex-1 p-2 overflow-y-auto space-y-4">
+      <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-5">
         {NAV_SECTIONS.map(({ heading, items }) => (
           <div key={heading}>
-            <p className="px-3 pt-1 pb-1 text-xs font-semibold uppercase tracking-widest text-gray-500">
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-600">
               {heading}
             </p>
             <div className="space-y-0.5">
@@ -62,13 +62,13 @@ export function Sidebar({
                 <button
                   key={view}
                   onClick={() => onNavigate(view)}
-                  className={`w-full text-left px-3 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors cursor-pointer ${
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${
                     currentView === view
-                      ? 'bg-gray-700 text-white'
-                      : 'hover:bg-gray-800 hover:text-white'
+                      ? 'bg-white/10 text-white font-medium'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
                   }`}
                 >
-                  <span className="text-base leading-none">{icon}</span>
+                  <span className="text-base leading-none opacity-80">{icon}</span>
                   {label}
                 </button>
               ))}
@@ -77,24 +77,24 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div className="p-3 border-t border-gray-700 space-y-2">
+      <div className="px-3 py-3 border-t border-white/5 space-y-2">
         <button
           onClick={onSync}
           disabled={isSyncing}
-          className="w-full px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+          className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer font-medium"
         >
           {isSyncing ? 'Syncing...' : 'Sync All'}
         </button>
 
         {lastSyncedAt && (
-          <p className="text-xs text-gray-500 text-center">
-            Last synced: {lastSyncedAt.toLocaleTimeString()}
+          <p className="text-[10px] text-gray-600 text-center">
+            {lastSyncedAt.toLocaleTimeString()}
           </p>
         )}
 
         <button
           onClick={onSignOut}
-          className="w-full px-3 py-2 text-gray-400 hover:text-white text-sm transition-colors cursor-pointer"
+          className="w-full px-3 py-1.5 text-gray-600 hover:text-gray-300 text-xs transition-colors cursor-pointer"
         >
           Sign out
         </button>

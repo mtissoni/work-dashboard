@@ -57,7 +57,7 @@ export function InboxView({
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Inbox</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Inbox</h1>
           <p className="text-sm text-gray-500 mt-1">
             {emails.length} emails, {actionable.length} need attention
           </p>
@@ -133,10 +133,10 @@ export function InboxView({
 
       {actionable.length > 0 && (
         <div>
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
+          <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 py-2">
             Needs Attention ({actionable.length})
           </h2>
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             {actionable.map((email) => (
               <EmailRow
                 key={email.id}
@@ -152,11 +152,11 @@ export function InboxView({
       )}
 
       <div>
-        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider px-3 py-2">
+        <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-3 py-2">
           {actionable.length > 0 ? 'Other' : 'All Emails'} ({recent.length})
         </h2>
         {recent.length > 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             {recent.map((email) => (
               <EmailRow
                 key={email.id}
